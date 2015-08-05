@@ -1,0 +1,82 @@
+\input texinfo
+@settitle GCOM: Generic Component Object Model
+@setfilename gcom.info
+@setshortcontentsaftertitlepage
+
+@copying
+Copyright @copyright{} 1999, 2000, 2001, 2002, 2003, 2004 Samuel A. Falvo II
+
+@quotation
+This software is provided 'as-is', without any implied or express warranty.
+In no event shall the authors be held liable for damages arising from the
+use this software.
+
+Permission is granted for anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software in a
+   product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source
+   distribution.
+@end quotation
+@end copying
+
+@titlepage
+@title Generic Component Object Model
+@subtitle Programmers Reference Guide
+@author Samuel A. Falvo II <kc5tja@arrl.net>
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@shortcontents
+@contents
+
+@ifnottex
+@node Top
+@top Generic Component Object Model
+
+The Generic Component Object Model, or GCOM, is an open source
+implementation of Microsoft's COM middle-ware technology.  GCOM was
+written primarily as a learning tool, to figure out how it worked under
+the hood.  Since then, it has evolved to a stable, in-process-only COM
+implementation, absolutely ideal for application extensibility uses.
+Future development of GCOM will take it into the realm of distributed
+objects, supporting an object RPC mechanism that will likely be built on
+top of the BEEP protocol.
+
+@menu
+* Copyright Notice:: GCOM's Copyright Notice, which also covers this
+documentation.
+
+* Why COM?:: Why COM?
+
+* Tutorial 1:: Making in-process clients and servers.
+
+* Index::  Concept Index.
+@end menu
+@end ifnottex
+
+@node Copyright Notice
+@unnumbered Copyright
+@insertcopying
+
+@include com.why.texinfo
+
+@include tutorial-1.texinfo
+
+@node Index
+@unnumbered Index
+
+@printindex cp
+
+@bye
+

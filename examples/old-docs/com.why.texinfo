@@ -1,0 +1,263 @@
+@node Why COM?
+@chapter Why COM?
+
+The Generic Component Object Model, or GCOM, is an open source
+implementation of Microsoft's COM middle-ware technology.  GCOM was
+written primarily as a learning tool, to figure out how it worked under
+the hood.  Once GCOM became stable with respect to in-process servers, I
+was asked to port GCOM to the Amiga DE environment.  This was GCOM's
+first production-grade application, where it became the Andromeda
+subsystem.  Andromeda is, unfortunately, no longer used in the Amiga
+software.  Still, after all these years of development with it, I have
+never heard of a single bug report.
+
+@section COM's Advantages
+
+COM has several advantages with respect to CORBA.
+
+@enumerate
+@item
+COM is faster for the most often used case: invoking in-process objects.
+Most applications are responsible for maintaining large collections of
+related objects.  The overwhelming majority of these application objects
+will reside in the application's memory space.  Therefore, it seems
+logical to conclude that the critical control flow path to invoking
+methods on these objects be made as short and as direct as possible.  COM
+does this.
+
+CORBA, however, doesn't permit this to occur without the development of a
+proprietary Object Adaptor.  The single fastest ORB I've seen, while
+still employing the CORBA POA specification is ORBit, where the control
+flow path must still traverse two if() statements, and at least one array
+dereference, before the functionality of the object is invoked.
+
+@item
+COM is a ``binary'' standard, instead of a ``paper'' standard, letting
+many different language bindings exist in the same execution domain, thus
+creating faster in-process communications between different language
+environments.
+
+@item
+COM is easy to understand, even trivial, how it works.  I wrote GCOM with
+the intent on learning how to make a CORBA-like or COM-like system, from
+scratch.  GCOM was completed in less than a week's worth of coding
+effort.  One does not need to master an interface description language to
+use COM, like one does with CORBA@footnote{However, an IDL compiler is
+very much recommended if you're going to be implementing distributed
+objects, because it saves you the hassle of having to write interfaces to
+marshal and unmarshal parameters.}.
+
+@item
+COM is scalable -- no part of the remoting infrastructure need be
+considered when restricting yourself exclusively to in-process objects.
+Contrast this with CORBA, where the remoting infrastructure is
+omnipresent; from the first time you write your first CORBA application,
+you're dealing with such concepts as Interoperable Object References,
+resolving initial object references, registering objects so the ORB can
+properly route incoming RPC calls, et. al.  This is not to say that CORBA
+is inherently bad because of this, but it does make the learning curve
+for CORBA steeper than for COM.
+
+@item
+COM provides effortless custom marshaling capabilities, for when
+IDL-generated proxies and stubs are not sufficient.  To date, I have not
+seen any standard method for incorporating this kind of functionality in
+CORBA.  If it does exist, it's ORB-specific, and thus, non-portable.
+
+@item
+COM provides effortless detection of an object's abilities via interface
+aggregation and interrogation.  With CORBA you need to compare the
+object's interface ID against a known inherited interface to determine if
+the object satisfies the requirements of an interface (or risk having to
+deal with "method not found" exceptions being thrown by the ORB).
+
+@item
+Remote COM methods are dispatched by number, not by name.  Since the
+ordering of methods in an interface is known a priori, method invokation
+is a simple table look-up operation, which executes in fixed time.  CORBA
+spends a large amount of time comparing @emph{strings} to dispatch a
+method.  This very often involves heavily nested IF-constructs in the
+language binding to eek out the most performance that is possible, thus
+resulting in excessive code size, and a general @emph{reduction} in
+dispatch throughput.
+
+@item
+COM's use of reference counting is a mixed blessing: on the one hand,
+object maintenance is greatly simplified, but it does place a greater
+burden on the programmer to ensure that no cycles can be created.  There
+seems to be no firm consensus on whether this is an advantage or
+disadvantage.  However, as environments such as Gnome are demonstrating,
+it appears that reference counting indeed solves more problems than it
+creates.
+
+@end enumerate
+
+@section Common Concerns about COM
+
+Many people have raised certain concerns with respect to COM, and how
+viable it is as a middleware technology.  I hope to address some of these
+concerns below.
+
+@enumerate
+@item
+COM does require more boilerplate code up-front than CORBA when
+implementing an object type.  For example, when implementing an object
+server library, one has to remember to also implement class factory
+objects for each kind of object the library supports, as well as the
+normal COM object implementations themselves.  Then there are
+library-global functions used to determine when it's safe to unload the
+library.  For each kind of object, supporting object creation with
+Microsoft's defined aggregation rules requires more in-depth
+understanding of how to write the @code{IUnknown::QueryInterface()}
+method@footnote{Fortunately, the additional complexity required for
+aggregation is localized only to those objects which actually
+@emph{needs} such flexibility.}.
+
+IDL compilers would take care of all these matters largely automatically,
+but the fact remains: if you compare the output of a COM-aware IDL
+compiler and a CORBA-aware IDL compiler, more code will appear in the COM
+sources, at least for small component library implementations.
+
+However, the boiler-plate grows more slowly than it does with CORBA.
+CORBA's boiler-plate is per-object and per-method, not per library or per
+server process@footnote{This is based on observations of code output from
+ORBit, MICO, and OmniORB.}.  Therefore, the more methods an object
+implementation supports, and the more kinds of objects that a process
+supports, the more boiler-plate code the IDL compiler introduces.  There
+is very little re-use between this code.
+
+@item
+It is often said that COM lacks innate support for exceptions like CORBA
+has, but this is not strictly a problem either.  There are three
+approaches to resolving this issue, none of which requires any changes to
+the core COM concepts.
+
+First, calling conventions can be made to support exception passing in a
+manner not unlike CORBA's C-language mapping.  More importantly,
+interfaces which don't throw exceptions needn't pass an exception pointer
+with every method call, like CORBA's C mapping requires.  IDL compilers
+can automate and, to a limited extent, even hide this mapping precisely
+as CORBA's IDL does, when necessary.
+
+The second approach, and I think this is one that Microsoft's DCOM
+implementation takes@footnote{I have no firm data to back this up,
+however.}, is that each thread has a thread-global object that implements
+@code{IException}.  When invoking a remote method, if an exception is
+thrown, the RPC objects are responsible for unmarshaling these exception
+conditions, and setting the @code{IException} object for the thread.
+Then, the proxy object that the client calls through is responsible for
+detecting the exception and invoking the relavent language-specific
+mapping for it.
+
+The third approach that I can think of is to require the @emph{object
+itself} to support an interface like @code{IException}.  If an error
+occurs invoking a method on the object, then the object state itself is
+responsible for keeping track of the erroneous condition.  This has the
+advantage that it does not require any thread-local storage or other
+OS-specific features.  It is directly implementable by any COM object
+implementation, regardless of whether it's working on a Commodore 64 or a
+CDC Cyber 64-bit architecture.
+
+@item
+It is often said that COM lacks the concept of a unique object identity.
+There are actually two facets to this concern: locating an object by
+name, and comparing an object's identity against another object
+reference.
+
+First, we tackle the problem of naming a unique object.  In CORBA, an
+interoperable object reference (@dfn{IOR}) is basically a pointer to an
+object instance that (hopefully) continues to exist.  Since IORs are stored
+externally from a program, a process wanting to use the object must read
+in the IOR's contents, then invoke @code{ORB::string_to_object()}.
+This returns an object reference the program can understand and use
+directly.  So that the ORB can know ahead of time what proxy to
+instantiate, the IOR also includes with it the object's type ID.
+Therefore, the application receives an object reference to the
+appropriate proxy when @code{ORB::string_to_object()} returns.
+
+However, what CORBA calls IORs are known as ``monikers'' in the COM
+world.  According to Merriam Webster's online
+dictionary@footnote{@uref{http://www.m-w.com}}, a moniker is defined as:
+
+@quotation
+Main Entry: mon·i·ker
+Variant(s): also mon·ick·er /'mä-ni-k&r/
+Function: noun
+Etymology: probably from Shelta (language of Irish itinerants) munnik,
+modification of Irish ainm
+: NAME, NICKNAME
+@end quotation
+
+As one might expect, a @dfn{moniker} in the COM community is some kind of
+object that @emph{refers} to another object.  A typical moniker might
+simply be a well-formed text file that includes a URI of some kind (e.g.,
+`http://www.falvotech.com' is a valid moniker), along with what kind of
+object it is, usually in the form of an embedded ``CLSID''.  Of course,
+more sophisticated moniker representations can exist as well, but are
+rarely needed.
+
+The second half of the issue is testing objects for equal identity.  It
+is true that COM provides no innate way to compare an object reference
+for identity, because applications simply don't have object references;
+they have interface references instead.  Therefore, to achieve the goal
+of identity comparison, the relavent objects must implement an interface
+which has an identity comparison method.  If the object is remote, this
+could incur run-time overheads if the application needs to compare
+identities on a large number of objects@footnote{I believe this happens
+for CORBA as well, as identity comparison requires the proxy to invoke
+the @code{Object::hash()} function to compute identity equivalency;
+therefore, CORBA has no significant gain over COM in this field of
+application either.}.
+
+Fortunately, it turns out that this is a relatively rare operation to
+perform.  In most cases, entire objects are not used as search keys
+except in some pretty rare applications.  Usually a more primitive data
+type is used to look for or collate objects.  Furthermore, for those
+objects that both require identity checks and high performance, COM's
+flexibility to implement custom proxies can be exploited to permit
+identity caching, thus keeping all identity-relavent state information
+local to the application, something CORBA doesn't provide any (standard)
+equivalent for.
+
+@item
+Finally, distributed COM objects often require the use of "pinging" to
+see if remote objects are still alive.  Of course, even this is not
+nearly as big a problem as most make it out to be; pings can be
+piggy-backed on top of other remote requests, and if necessary, can even
+be turned off completely, in precisely the same way that TCP ACK packets
+are piggy-backed on other TCP messages to a given machine.
+
+@end enumerate
+
+All in all, the most commonly voiced disadvantages to COM seem
+all-together insignificant when viewed against the larger backdrop of the
+problems it solves.  I feel, for instance, that CORBA's lack of support
+for in-process objects is a devastatingly serious disadvantage to using
+CORBA for desktop environments, for example.
+
+@section COM's Only Incontrovertible Disadvantage
+
+The only disadvantage that COM has is its lack of public documentation to
+serve as a reference for other implementations.  The COM 0.9
+@emph{preliminary} specifications document is available for download off of
+Microsoft's website, and indeed, is what GCOM itself is based off of.
+However, it doesn't cover the full gamut of COM's implementation nuances
+on the Windows platform.  This is a deliberate decision on the part of
+Microsoft.
+
+Therefore, GCOM, while it has an interface that adheres to the 0.9
+specifications, @emph{must stop there.}  That is to say, everything else
+in the GCOM environment is GCOM specific, because there are no further
+standards to ensure conformance to.  And even if I could, I'm sure
+Microsoft would probably want to seek legal actions against myself or
+other GCOM users or developers.
+
+Therefore, I must point out that GCOM is a pure implementation of COM,
+totally clean-room design, without any Microsoft influence, short of
+their publically available standards document.  This means that GCOM will
+inevitably have an incompatible distributed object infrastructure, a
+completely incompatible moniker file format, unique registry layouts,
+etc.  Indeed, the core services delivered by the minimum GCOM
+configuration will likely be very different from Microsoft's
+implementation, shipped with every copy of Windows.
+

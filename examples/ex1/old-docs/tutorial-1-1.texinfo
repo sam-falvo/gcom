@@ -1,0 +1,79 @@
+@node Tutorial 1 Introduction
+@section Introduction
+
+The Component Object Model (@dfn{COM}) was first created and used by
+Microsoft as the enabling technology behind their Object Linking and
+Embedding technology for their Office 6.0 application suite.  Since then,
+COM has found increasing amounts of use throughout the Windows platform.
+COM is now the foundation technology behind ActiveX (drop-in user
+interface components which can be used almost anywhere, ranging from web
+pages to Visual BASIC applications), Active Data Objects (the object
+oriented interface for ODBC), DirectX (Microsoft's high performance video
+subsystem), Media Player plug-in modules, the user interface shell
+itself, and more.  Indeed, one can argue that COM is the new Windows API.
+
+COM has also found increasing popularity outside of Microsoft's
+headquarters.  COM is now found in such public domain or freeware
+software packages as the Flux Operating System Toolkit, and is the
+central object model employed by Mozilla, the highly cross platform web
+browser destined to replace the current generation of Netscape web
+browsers.
+
+COM's popularity over other standards, such as CORBA, SOM, and Java,
+stems from two absolutely critical features: it's astonishingly easy to
+understand how COM works from the inside out, and it's incredibly fast.
+
+COM also has certain shortcomings which makes COM appear to be more
+trouble than its worth.  COM tends to be very code centric, not data
+centric; as a result, more boilerplate code is required initially to get
+an object implementation working under COM than other object models.
+However, the boilerplate code needed by COM amounts to about the same
+amount of meta-data for other object systems for all but the smallest
+object implementations.  Also, boilerplate in COM tends to grow at a
+smaller rate than it does for CORBA@footnote{Based on observed results
+from OmniORB, MICO, and ORBit IDL compilers.}.
+
+This document does not make any attempts to explain all of COM and its
+benefits, or its API, to the reader.  In fact, it doesn't even make use
+of any form of Interface Description Language (IDL) to make your life
+easier.  Instead, this document explains how to write a component library
+which implements one or more COM classes, using nothing more than your C
+compiler, and how to make its presence known to the rest of the system.
+Thanks to the simplicity of COM, however, reading this tutorial will give
+valuable insight on how COM works from both a server and a client
+perspective.
+
+There are two concepts which must be learned before proceeding further --
+that of clients and servers.  The words describe various roles a piece of
+software fulfill.  A client, for example, is any piece of software which
+submits a request for a service.  A server, then, is any piece of
+software that actually provides a service.  Please note that a single
+piece of software can simultaneously be a client AND a server.
+
+Most components are designed to work with the COM subsystem as a shared
+object, also known as a library.  This allows the COM subsystem to
+dynamically load COM object implementations as they are needed, and to
+unload them when appropriate.  Another advantage to this is that there is
+no cross-address-space overhead for invoking methods.  Consider a widget
+toolkit for a graphical user interface, and try to imagine the sheer
+amount of overhead that would exist if the user had to invoke services in
+another running process for every on-screen (and perhaps even off-screen)
+widget it wanted to create.  Even custom-designed, hand-crafted RPC
+mechanisms don't help with the basic inadequacies of this method, as the
+FreeDesktop's efforts to replace Xlib with a leaner, meaner
+implementation demonstrates.
+
+However, it is also true that COM components @emph{should} be totally
+location transparent to support objects that @emph{do} reside outside of
+a program's address space.  Indeed, COM does exhibit this property.
+However, this tutorial will not demonstrate such mechanisms.
+
+@section A Word About Class Versus Component Libraries
+
+There has been confusion on when to use the term ``class library'' and
+when to use ``component library''.  Libraries designed to provide
+implementations of COM objects are known as component libraries @emph{or}
+as class libraries.  The former name is preferred, so as to disambiguate
+them from language-specific class libraries.  The latter name is quite
+common in the Windows programming world, so you'll quite likely see its
+use with respect to GCOM as well.  It's good to be aware of both.

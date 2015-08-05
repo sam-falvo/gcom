@@ -1,0 +1,30 @@
+This file contains a transcript of the changes I made to go from Elate
+version of GCOM 0.3 to the Linux version of GCOM 0.3.
+---------------------------------------------------------------------------
+1.  Changed all WCHAR to wchar in the following files:
+
+	unicode.c
+	misc.c
+	init.c
+	dll.c
+	class.c
+
+2.  Change license comment block in the following files:
+
+	unicode.c
+	misc.c
+	init.c
+	dll.c
+	class.c
+	alloc.c
+
+3.  Change all the <gcom/*> includes to simply use <gcom/gcom.h>
+
+4.  Deleted reg.c -- it's simply not being used anymore.
+
+5.  Changed <gcom/lists.h> to <util/lists.h> in:
+
+	dll.c
+	alloc.c
+	lists.c
+

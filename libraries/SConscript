@@ -1,0 +1,31 @@
+import string
+
+Import( 'env' )
+
+modules = [
+    'alloc.c',
+    'dll.c',
+    'lists.c',
+    'misc.c',
+    'unicode.c',
+    'init.c',
+    'constants.c',
+    'class.c'
+]
+
+
+defines = {
+    'MAX_PATH_LEN'  : string.atoi( env['MAX_PATH_LEN'] ),
+    'MAX_REGKEY_LEN': string.atoi( env['MAX_REGKEY_LEN'] ),
+    'REGPATH'       : '\\"%s\\"' % ( env['REGPATH'] ),
+    env['PLATFORM'] : None
+}
+
+env.SharedLibrary(
+    target=env['LIBGCOM'],
+    source=modules,
+    CPPDEFINES=defines,
+    CPPPATH=env['INCDIRS'],
+    LIBS=['dl']
+)
+

@@ -1,0 +1,10 @@
+What you've seen in this example is actually pretty rarely ever hand-coded
+anymore on other platforms.  Regular use of tools like Interface Description
+Language (IDL) compilers helps automate the drudgery of creating COM object
+implementations by converting descriptive text files into the appropriate
+collection of source files suitable for your target platform.  In addition,
+using IDL compilers can take advantage of platform-specific extensions.
+Consider co-classes under Windows, and the newly created COM+ extensions,
+which succeed in making COM implementations far easier than we've
+demonstrated here.  There is nothing standing in the way of such extensions
+being made for GCOM either, except public acceptance.

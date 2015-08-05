@@ -1,0 +1,63 @@
+We can test out our COM server implementation by writing a quick and dirty
+client application which instantiates an object, calls its methods, and
+quickly exits.  Here is that client:
+
+	/* In client.c */
+
+	#include <gcom/gcom.h>
+	#include <stdio.h>
+
+	#include "IDisplayText.h"
+	#include "CLSID_Example1.h"
+
+	#define MSG		"Hello world!!"
+	#define MSGLEN		(strlen(MSG)+1)
+
+	int main( void )
+	{
+	   HRESULT hr;
+	   IDisplayText *pdt;
+
+	   hr = CoInitialize( NULL );
+	   if( FAILED(hr) )
+	   {
+	      printf( "Couldn't initialize the COM library: $%08X\n", hr );
+	      return 1;
+	   }
+
+	   hr = CoCreateInstance(
+				 CLSID_Example1,
+				 NULL,
+				 CLSCTX_SERVER,
+				 IID_IDisplayText,
+				 (void *)&pdt
+				);
+	   if( SUCCEEDED(hr) )
+	   {
+	      pdt -> lpVtbl -> SetText( pdt, MSG, MSGLEN );
+	      pdt -> lpVtbl -> Display( pdt );
+
+	      pdt -> lpVtbl -> Release( pdt );
+	   }
+	   else
+	      printf( "Couldn't create object of example1.so: $%08X\n", hr );
+	
+	   CoUninitialize();
+	   return 0;
+	}
+
+Note how we included CLSID_Example1.h/.c and IDisplayText.h/.c, for without
+these, we would not have access to either IID_IDisplayText or CLSID_Example1
+without having to manually define them in our source package.  This would be
+an issue had we used an IDL compiler to generate the skeleton source files
+for our client.
+
+Add the following lines to the Makefile to get the client to build:
+
+	# In Makefile
+	
+	client: client.o CLSID_Example1.o IDisplayText.o
+		$(LD) -o client client.o CLSID_Example1.o IDisplayText.o $(LDLIBS)
+
+And that's it.  A simple 'make client' is all that's needed to build the
+test application and start using your very own COM objects!

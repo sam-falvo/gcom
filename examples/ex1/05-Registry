@@ -1,0 +1,99 @@
+Now that we got the three major pieces written up, now it's time to put them
+together into a cohesive package.  We start my writing the various makefiles
+for the component library.  I like to break my makefiles into two pieces: a
+CONFIG.mk file, which contains configuration information that is usually
+independent of the build process, and the Makefile itself, which contains
+the remainder of the rules.  Here they are:
+
+	# In CONFIG.mk
+
+	LIBPATH		= /andromeda/libraries
+	REGPATH		= /andromeda/registry
+	INCLUDEPATH	= /andromeda/include
+
+	LD		= vpcc
+	LDFLAGS		= -shared
+	LDLIBS		= -L$(LIBPATH) -lcom
+
+	CC		= vpcc
+	CCFLAGS		= -g -c
+
+
+
+	# in Makefile
+
+	include CONFIG.mk
+
+	SRCS =	CLSID_Example1 IClassFactory_impl IDisplayText IDisplayText_impl
+
+	.c.o:
+		$(CC) $(CCFLAGS) -I$(INCLUDEPATH) -o $@ $<
+
+	example1.so: $(SRCS:%=%.o)
+		$(LD) $(LDFLAGS) -o example1.so $(SRCS:%=%.o) $(LDLIBS)
+
+At this point, everything should compile and build with a simple "make"
+command.
+
+After building the library, you should see two files in the current
+directory: example1.so and example1.so.00.  These are the Elate library
+files which is what the COM subsystem uses to load and access your object's
+class factories with.  But we still can't create objects in a client
+application because the COM subsystem has no idea where to *find* the
+component library.  In addition, it also has no idea what classes you
+implement.
+
+Enter the registry.  On the Windows platform, the registry has gained a
+nasty reputation as being this monstrous repository of all configuration
+information available in the system.  To a large extent, this is indeed
+true.  However, the Windows registry is also the single biggest asset it
+has, for it is a filesystem independent manner of storing arbitrary
+attributes about software.  Indeed, the way Windows uses the registry for
+COM is, in a word, genious.
+
+However, other platforms don't have a registry.  But they do have a
+filesystem of some flavor, and there isn't a system anywhere, made after
+1990, that doesn't support long filenames (any filename over 32 characters
+is, in my book, a long filename).  Putting two and two together, and it
+follows that we can use the filesystem itself as our system registry!
+
+GCOM uses its registry in a manner different from Windows -- it's much more
+direct, and in my opinion, easier to understand.  The registry is located at
+the file location /andromeda/registry, and contains several subdirectories:
+
+	/InprocServers		Contains files which point to component
+				libraries for in-process object implement-
+				ations.
+
+	/InprocHandlers		Pretty much the same thing here.  Only the
+				intended use is different.  See the Micro-
+				soft COM 0.9 Specifications document for
+				more information on how handlers and servers
+				differ.
+
+	/TreatAs		Contains files contains class treat-as
+				relationships, allowing some classes to
+				masquerade as other classes (this is often
+				used to patch system services post-boot).
+
+Each file under the /andromeda/registry/... hierarchy is an ordinary text
+file, editable with your favorite editor.  However, the registry is
+explained in more detail in another tutorial.
+
+To inform the COM system that your class implementation is ready to be used,
+you must place a registry entry within the InprocServers directory.  This is
+done by editing a new text file, whose filename is the class ID of the
+object, and provide the location of the example1.so file:
+
+	$ jove /andromeda/registry/InprocServers/{{87E7146A-34A2-11D5-8000-000001135627}}
+
+and place the following as the very first line of the text file:
+
+	/andromeda/examples/ex1/example1.so
+
+NOTE:	Do NOT place any whitespace in front of or within the line.  The COM
+	subsystem does not properly handle spaces in filenames either.  This
+	will be fixed in a later build of GCOM.
+
+Save the file, and exit the editor.  Congradulations, you now have a
+registered COM object implementation, ready and waiting to be used!

@@ -1,0 +1,168 @@
+Providing an implementation for an object is very similar to the creation of
+the library's class factory objects.  This should come as no surprise -- the
+class factory objects *are* regular COM objects, like any other you'd ever
+come across.  However, the important distinction here is that you'll almost
+never have a statically defined object if you've got a class factory for it.
+Instead, the class factory will dynamically create objects and initialize
+them to sane defaults as they are needed by applications.
+
+You'll notice in IClassFactory_impl.c that we included a header file called
+IDisplayText_impl.h.  This header file, and its corresponding .c file, are
+the server-side counterparts to the IDisplayText.h/.c files we've already
+introduced.  These files contain the real meat of the matter -- when a
+client calls upon IDisplayText::Display(), it's the Display() function in
+IDisplayText_impl.c file that gets called.
+
+It's clear that our objects must have a reference count in them, for when
+its goes to zero, the object must be destroyed.  We also need a buffer for
+storing the text we want to display (see secton 2, Interfaces, if you need a
+quick reminder of what it is we're programming).  So let's go ahead and
+define IDisplayText_impl.h:
+
+	/* in IDisplayText_impl.h */
+	
+	#include "IDisplayText.h"
+	
+	typedef struct IDisplayText_impl IDisplay_impl;
+	struct IDisplayText_impl
+	{
+	   IDisplayTextVtbl *	lpVtbl;
+	   uint32		referenceCount;
+	   char			buffer[128];
+	};
+
+Since these objects are always created dynamically, via
+IClassFactory::CreateInstance(), some means is required of initializing
+these objects to a sane default.  The IClassFactory()::CreateInstance()
+function calls a procedure called InitializeDisplayTextObject() (see section
+3, Class Factories, for a reminder).  This initialization involves three
+things: setting the lpVtbl field of the object correctly, setting the
+reference count to zero (yes, that's right -- zero), and clearing the text
+buffer.  IClassFactory()::CreateInstance() then calls the object's
+QueryInterface method (remember: a client never holds a direct reference to
+an object, but only to one of its interfaces.  The fact that the object *is*
+the interface in this example is only an implementation detail).  It is this
+QueryInterface() which will increment the reference count to one if
+successful.
+
+	/* in IDisplayText_impl.c */
+	
+	#include "IDisplayText_impl.h"
+	#include "IClassFactory_impl.h"
+
+	static HRESULT QueryInterface( IDisplayText *, REFIID, void ** );
+	static uint32 AddRef( IDisplayText * );
+	static uint32 Release( IDisplayText * );
+	static HRESULT SetText( IDisplayText *, char *, uint32 );
+	static HRESULT GetText( IDisplayText *, char *, uint32 );
+	static HRESULT Display( IDisplayText * );
+	
+	/* ... */
+
+	static IDisplayTextVtbl vtbl =
+	{
+	   &QueryInterface,
+	   &AddRef,
+	   &Release,
+	   &SetText,
+	   &GetText,
+	   &Display
+	};
+
+	/* ... */
+	
+	void InitializeDisplayTextObject( IDisplayText_impl *pdtImpl )
+	{
+	   memset( pdtImpl, 0, sizeof( IDisplayText_impl ) );
+	   pdtImpl -> lpVtbl = &vtbl;
+	}
+
+	/* ... */
+	
+	static HRESULT QueryInterface(
+				      IDisplayText *pdt,
+				      REFIID riid,
+				      void **ppvResult
+				     )
+	{
+	   HRESULT hr = E_NOINTERFACE;
+
+	   *ppvResult = NULL;
+	   
+	   if( IsEqualIID( IID_IUnknown, riid ) ||
+	       IsEqualIID( IID_IDisplayText, riid ) )
+	   {
+	      *ppvResult = (void *)pdt;
+	      AddRef( pdt );
+	      hr = S_OK;
+	   }
+	   
+	   return hr;
+	}
+
+	static uint32 AddRef( IDisplayText *pdt )
+	{
+	   (((IDisplayText_impl *)pdt) -> referenceCount)++;
+	   return 1;
+	}
+
+	static uint32 Release( IDisplayText *pdt )
+	{
+	   IDisplayText_impl *self = (IDisplayText_impl *)pdt;
+	   extern IClassFactory_impl g_ClassFactory;
+
+	   if( self -> referenceCount != 0 )
+	   	self -> referenceCount--;
+
+	   if( self -> referenceCount == 0 )
+	   {
+	      free( self );	/* Allocated by malloc() in class factory */
+	      g_ClassFactory.objectCount--;
+	   }
+	   
+	   return 0;
+	}
+
+	static HRESULT SetText( IDisplayText *pdt, char *buf, uint32 size )
+	{
+	   HRESULT hr = S_OK;
+	   IDisplayText_Impl *self = (IDisplayText_impl *)pdt;
+	   
+	   if( size > 128 )
+	   {
+	      hr = S_FALSE;	/* Just letting the client know... */
+	      size = 128;	/* that his buffer was too big to fit. */
+	   }
+
+	   strncpy( self -> buffer, buf, size );
+	   self -> buffer[127] = 0;	/* Just in case... */
+	   
+	   return hr;
+	}
+
+	static HRESULT GetText( IDisplayText *pdt, char *buf, uint32 size )
+	{
+	   HRESULT hr = S_OK;
+	   IDisplayText_impl *self = (IDisplayText_impl *)pdt;
+	   uint32 realSize = strlen( self -> buffer );
+	   
+	   if( realSize > size )
+	   {
+	      realSize = size;
+	      hr = S_FALSE;
+	   }
+	   
+	   strncpy( buf, self -> buffer, realSize );
+	   return hr;
+	}
+
+	static HRESULT Display( IDisplayText *pdt )
+	{
+	   IDisplayText_impl *self = (IDisplayText_impl *)pdt;
+	   
+	   printf(
+	   	  "IDisplayText::Display() says, \"%s\"\n",
+		  self -> buffer
+		 );
+	   return S_OK;
+	}

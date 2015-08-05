@@ -1,0 +1,19 @@
+TODO List for GCOM 0.3 -> GCOM 0.4
+----------------------------------
+
+1.  Write more tutorials and/or programmers reference chapter
+2.  Re-factor the GCOM sources so that it's easier to add new
+    functionality.
+3.  Rewrite genuuid to conform more closely with the IETF draft
+    standard (which was never adopted, but it's the algorithm that
+    Microsoft uses for their system, so why not?).  Also ponder the
+    support of taking an MD5 hash of a name, as per CORBA specs.
+4.  Make greater use of COM itself to provide:
+    a.  OS-independent filesystem access
+    b.  Make GCOM completely isolated from registry implementation
+    c.  Provide plug-ins for component library location and activation
+    d.  Provide support for remote objects
+    e.  Provide support for multithreading.
+5.  Write an IDL compiler to ease the construction of COM components.
+    Research both OMG IDL (preferred) and MS IDL (iick!).
+

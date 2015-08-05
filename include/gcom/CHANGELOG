@@ -1,0 +1,9 @@
+1.  re-engineered the types.h file to include #if statements guarding the
+    definitions of (u)int(8|16|32), and introduced (u)int64 for the first time.
+
+2.  Introduced the lowercase type wchar, typedef'ed from wchar_t.
+
+3.  In unicode.h, I removed WCHAR and OLECHAR, since wchar is now in
+    types.h.  Also cleaned up the prototypes section of the unicode.h file.
+
+4.  Removed unsupported functions from the registry.h file.

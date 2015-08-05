@@ -1,0 +1,276 @@
+@node Tutorial 1 Object Factories
+@section Object Factories
+
+The COM run-time environment doesn't have enough knowledge about the
+various classes in the system to be able to instantiate objects.  For
+this reason, COM defers all object creation to the responsible component
+libraries.  It actually turns out that this is what you'd want to do
+anyway; a COM object can be implemented in @emph{any} language, not just
+in C.  It does this by acquiring an @code{IClassFactory} interface from
+the component library.  Keep in mind that a single library @emph{can}
+provide more than one class factory.
+
+Class factory objects are full-fledged COM objects in their own right.
+This means that they exhibit the @code{IUnknown} interface as well as the
+@code{IClassFactory}-specific methods @code{CreateInstance()} and
+@code{LockServer()}.  There exists only one class factory object per
+class of objects in the system.  For this reason, you'll quite often see
+class factory implementations that are defined at the library's global
+scope (as we will in this section).
+
+The first step towards creating the class factory object is to define
+what data a class factory needs.  We know that the library cannot be
+unloaded if there are still objects which the class is responsible for in
+existance.  We also know that we cannot unload the library if the number
+of references to the factory is greater than zero.  In addition, the COM
+specification allows for a class implementation to be "locked" in memory,
+via the @code{LockServer()} method on the class factory object.
+Therefore, a minimal class factory would look something like this:
+
+@example
+  /* in IClassFactory_impl.h */
+  
+  #include <gcom/gcom.h>
+  
+  typedef struct IClassFactory_impl IClassFactory_impl;
+  struct IClassFactory_impl
+  @{
+     IClassFactoryVtbl *epv; /* Same as IClassFactory */
+     
+     uint32 objectCount;
+     uint32 lockCount;
+     uint32 referenceCount;
+  @};
+@end example
+
+And we define the class factory statically in
+@code{IClassFactory_impl.c}:
+
+@example
+  /* in IClassFactory_impl.c */
+
+  #include "IClassFactory_impl.h"
+  #include "IDisplayText_impl.h"
+
+  static HRESULT QueryInterface( IClassFactory *, REFIID, void ** );
+  static uint32 AddRef( IClassFactory * );
+  static uint32 Release( IClassFactory * );
+  static HRESULT CreateInstance(
+              IClassFactory *,
+              const IUnknown *,
+              REFIID,
+              void **
+             );
+  static HRESULT LockServer( IClassFactory *, Bool );
+
+  extern void InitializeDisplayTextObject( IDisplayText_impl * );
+
+  /* ... */
+
+  static IClassFactoryVtbl vtbl =
+  @{
+     &QueryInterface,
+     &AddRef,
+     &Release,
+     &CreateInstance,
+     &LockServer
+  @};
+
+  IClassFactory_impl g_ClassFactory =
+  @{
+     &vtbl,
+     0,
+     0,
+     0
+  @};
+
+  /* ... */
+
+  static HRESULT QueryInterface(
+              IClassFactory *pcf,
+              REFIID riid,
+              void **ppvResult
+             )
+  @{
+     HRESULT hr = E_NOINTERFACE;
+     
+     *ppvResult = NULL;
+     
+     if( IsEqualIID( IID_IUnknown, riid ) ||
+         IsEqualIID( IID_IClassFactory, riid ) )
+     @{
+        *ppvResult = (void *)pcf;
+        AddRef( pcf );
+        hr = S_OK;
+     @}
+     
+     return hr;
+  @}
+  
+  static uint32 AddRef( IClassFactory *pcf )
+  @{
+     (((IClassFactory_impl *)pcf) -> referenceCount)++;
+     return 1;
+  @}
+  
+  static uint32 Release( IClassFactory *pcf )
+  @{
+     IClassFactory_impl *self = (IClassFactory_impl *)pcf;
+     
+     if( self -> referenceCount != 0 )
+      self -> referenceCount--;
+  @}
+  
+  static HRESULT CreateInstance(
+              IClassFactory *pcf,
+              const IUnknown *punkOuter,
+              REFIID riid,
+              void **ppvResult
+             )
+  @{
+     HRESULT hr = E_OUTOFMEMORY;
+     IDisplayText_impl *pdtImpl;
+
+     *ppvResult = NULL;
+
+     /* Aggregation is discussed in another tutorial.  For now,
+      * just to keep things simple, we don't support aggregation.
+      */
+     if( punkOuter != NULL )
+      return E_NOAGGREGATION;
+
+     pdtImpl = (IDisplayText_impl *)
+           ( malloc( sizeof( IDisplayText_impl ) ) );
+     if( pdtImpl != NULL )
+     @{
+        InitializeDisplayTextObject( pdtImpl );
+        hr = pdtImpl -> lpVtbl ->
+            QueryInterface(
+               (IDisplayText *)pdtImpl,
+               riid,
+               ppvResult
+              );
+        if( FAILED(hr) )
+           pdtImpl -> lpVtbl -> Release( (IDisplayText *)pdtImpl );
+        else
+           g_ClassFactory.objectCount++;
+     @}
+     
+     return hr;
+  @}
+  
+  static HRESULT LockServer( IClassFactory *pcf, Bool reallyLock )
+  @{
+     IClassFactory_impl *self = (IClassFactory_impl *)pcf;
+     
+     if( reallyLock == TRUE )
+        g_ClassFactory.lockCount++;
+     else
+     @{
+        if( g_ClassFactory.lockCount != 0 )
+           g_ClassFactory.lockCount--;
+     @}
+     
+     return S_OK;
+  @}
+@end example
+
+Two things still need to go into the @code{IClassFactory_impl.c} file: a
+method of determining whether or not it's safe to unload the library, and
+a method of letting the COM subsystem acquire access to the class factory
+object.  As you might have guessed, classes, or more accurately
+@emph{factories}, are identified using a 128-bit UUID, just like
+interfaces are@footnote{It is important to note that they are totally
+separate number spaces though!}.  The class IDs are defined in a manner
+precisely the same as that for interfaces:
+
+@example
+  /* in CLSID_Example1.h */
+  
+  #include <gcom/gcom.h>
+  
+  /* @{87E7146A-34A2-11D5-8000-000001135627@} */
+  extern REFCLSID CLSID_Example1;
+
+
+
+  /* in CLSID_Example1.c */
+  
+  #include "CLSID_Example1.h"
+  
+  /* @{87E7146A-34A2-11D5-8000-000001135627@} */
+  DECLARE_CLSID(
+          Example1,
+          0x87E7146A,
+          0x34A2, 0x11D5, 0x8000,
+          0x00, 0x00, 0x01, 0x13, 0x56, 0x27
+         );
+
+@end example
+
+Before continuing, I would like to point out that the number space used
+for IIDs and CLSIDs are distinct.  So, in reality, we @emph{could} have
+used the same UUID for both @code{IID_IDisplayText} and
+@code{CLSID_Example1}.  Also, unlike IIDs, CLSIDs @emph{do} identify a
+particular object implementation.  Because CLSIDs are themselves UUIDs,
+and therefore guaranteed to be unique in a system, there is no need to
+qualify them with any other information, including version information.
+A different version component library simply has a different class ID.
+Libraries which provide backward compatibility do so by responding with
+the same class factory object to multiple class IDs (one for each major
+revision).
+
+@strong{NOTE}  When revising a component library to provide incremental
+enhancements, in particular one that does not require a change to an
+interface's binary level definition, it's generally @code{not} a good
+idea to issue a new class ID for it.  However, if you're adding an amount
+of new functionality that does require modifying the structural
+definition of an interface, then it is required that you assign a new
+class ID for the new version.
+
+Anyway, back to our regularly scheduled source code:
+
+@example
+  /* back in IClassFactory_impl.c */
+  
+  HRESULT DllCanUnloadNow( void )
+  @{
+     if( g_ClassFactory.objectCount != 0 )
+      return S_FALSE;
+
+     if( g_ClassFactory.referenceCount != 0 )
+      return S_FALSE;
+    
+     if( g_ClassFactory.lockCount != 0 )
+      return S_FALSE;
+
+     return S_OK;
+  @}
+
+  HRESULT DllGetClassObject(
+          REFCLSID rclsid,
+          REFIID riid,
+          void **ppvResult
+         )
+  @{
+     HRESULT hr = E_CLASSNOTREG;
+     
+     if( IsEqualIID( CLSID_Example1, rclsid ) )
+     @{
+        hr = QueryInterface(
+                (IClassFactory *)&g_ClassFactory,
+          riid,
+          ppvResult
+         );
+     @}
+     
+     return hr;
+  @}
+@end example
+
+At this point, we have completed the @code{IClassFactory_impl.c} file.
+As you can see, there's a bit of boiler plate code there.  Fortunately,
+with component libraries that implement more than one class of objects, a
+large portion of the above code can be re-used very effectively.  Now all
+that's left is the implementation of the display objects. 
+

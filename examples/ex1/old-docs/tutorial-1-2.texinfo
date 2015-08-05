@@ -1,0 +1,124 @@
+@node Tutorial 1 Defining Interfaces
+@section Defining Interfaces
+
+Every component library is generally broken up into three major
+subsections.  The first is the interface between the component library
+and the COM run-time environment itself.  The second is the collection of
+class factory objects.  The third and final subsection provides the
+implementation behind the objects manufactured by the factory objects.
+The example library presented in this tutorial only has one type of
+object under its control, so only one class factory and one object
+implementation.  However, the concept isn't hard to extend to differing
+numbers of object implementations.
+
+Let's start our tutorial by defining a COM interface which can accept a
+string for later display, retrieve the string, and display it.  Here's
+what such an interface would look like using straight C:
+
+@example
+  /* in IDisplayText.h */
+
+  #include <gcom/gcom.h>
+
+  typedef struct IDisplayText IDisplayText;
+  typedef struct IDisplayTextVtbl IDisplayTextVtbl;
+  
+  struct IDisplayText
+  @{
+     IDisplayTextVtbl *epv;
+  @};
+  
+  struct IDisplayTextVtbl
+  @{
+     HRESULT (*QueryInterface)( IDisplayText *, REFIID, void ** );
+     uint32 (*AddRef)( IDisplayText * );
+     uint32 (*Release)( IDisplayText * );
+     HRESULT (*SetText)( IDisplayText *, char *, uint32 );
+     HRESULT (*GetText)( IDisplayText *, char *, uint32 );
+     HRESULT (*Display)( IDisplayText * );
+  @};
+@end example
+
+This, in and of itself, isn't really all that bad.  But it sure is a lot
+to type, and as a result, very error prone.  In addition, each interface
+has a set of methods which are always required: @code{QueryInterface()},
+@code{AddRef()}, and @code{Release()} (these three methods comprise the
+@code{IUnknown} interface).
+
+The GCOM SDK provides a set of macros which helps automate the creation of
+interfaces:
+
+@example
+  /* in IDisplayText.h */
+
+  #include <gcom/gcom.h>
+  
+  BEGIN_INTERFACE( IDisplayText )
+     HRESULT (*SetText)( IDisplayText *, char *, uint32 );
+     HRESULT (*GetText)( IDisplayText *, char *, uint32 );
+     HRESULT (*Display)( IDisplayText * );
+  END_INTERFACE( IDisplayText )
+@end example
+
+This is not only much smaller, but it also guarantees correctness of the
+interface definition to the degree that @code{IUnknown} is defined
+correctly for the interface.
+
+Interfaces in COM are identified by a unique integer that's 128-bits
+long.  Note that this integer does @emph{not} identify a specific
+implementation of a given interface --- only the interface definition
+itself.  Interface IDs are named starting with @code{IID_}, followed by
+the name of the interface (which traditionally starts with the capital
+letter `I').  So the interface identifier for @code{IDisplayText} would
+read @code{IID_IDisplayText}.  We enable applications to reference
+@code{IID_IDisplayText} using the following construct:
+
+@example
+  /* in IDisplayText.h */
+
+  /* @{CE41F1D8-349C-11D5-8000-000001135627@} */
+  extern REFIID IID_IDisplayText;
+@end example
+
+Note that we don't actually provide the interface ID definition within the
+header file itself, as with other COM implementations.  This is because many
+C compiler toolchains have a few bugs in them which prevent the use of
+static constant data structures.  As a result, the actual definition must be
+provided in some external source form.  Besides, following this procedure
+for defining COM interfaces, while a little more inconvenient for the C
+programmer, does produce smaller executables because the same data constants
+aren't defined in the final binary more than once.
+
+@example
+  /* in IDispatchText.c */
+  
+  #include "IDispatchText.h"
+
+  /* @{CE41F1D8-349C-11D5-8000-000001135627@} */
+  DECLARE_IID(
+        IDisplayText,
+        0xCE41F1D8,
+        0x349C, 0x11D5, 0x8000,
+        0x00, 0x00, 0x01, 0x13, 0x56, 0x27
+       )
+@end example
+
+Where did we get the number from?  GCOM ships with a utility called
+@code{genuuid}, which produces a UUID for you@footnote{Due to its
+incomplete status, be sure to recompile @code{genuuid} with the hardware
+MAC address of your preferred Ethernet card, since it lacks any means for
+auto-detecting this information itself, at the time of this writing.}.
+This utility, however, currently should @emph{not} be used if you have a
+more capable utility, such as the @code{uuidgen} tool, which is bundled
+with the ext2fs/ext3fs tools in Linux.  With either tool, simply use the
+components from the output produced by the tool in the header file.  By
+convention, the output of the UUID generation command is placed as a C
+comment before the declaration, as shown above, and as a comment to the
+@code{extern REFIID} statement in the corresponding .h file.
+
+OK, so we have two files called @code{IDisplayText.h} and
+@code{IDisplayText.c}.  These files define important constants and
+structures needed to set forth a ``contract'' between the client and
+server.  Now what we need to do is actually start implementing a COM
+component library that actually creates objects which supports the
+@code{IDisplayText} interface.

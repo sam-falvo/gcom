@@ -1,0 +1,57 @@
+import string
+
+Import('env')
+
+SRC = [
+    'IClassFactory_impl.c',
+    'IDisplayText_impl.c'
+]
+
+defines = {
+    'MAX_PATH_LEN'  : string.atoi( env['MAX_PATH_LEN'] ),
+    'MAX_REGKEY_LEN': string.atoi( env['MAX_REGKEY_LEN'] ),
+    'REGPATH'       : '\\"%s\\"' % ( env['REGPATH'] ),
+    env['PLATFORM'] : None
+}
+                
+ssrc_class_example1 = env.SharedObject(
+    'CLSID_Example1.c',
+    CPPPATH=env['INCDIRS'],
+    CPPDEFINES=defines
+)
+
+src_class_example1 = env.StaticObject(
+    'CLSID_Example1.c',
+    CPPPATH=env['INCDIRS'],
+    CPPDEFINES=defines
+)
+
+ssrc_IDisplayText = env.SharedObject(
+    'IDisplayText.c',
+    CPPPATH=env['INCDIRS'],
+    CPPDEFINES=defines
+)
+src_IDisplayText = env.StaticObject(
+    'IDisplayText.c',
+    CPPPATH=env['INCDIRS'],
+    CPPDEFINES=defines
+)
+
+env.SharedLibrary(
+    target='example1',
+    source=SRC+[ssrc_class_example1, ssrc_IDisplayText],
+    CPPPATH=env['INCDIRS'],
+    LIBPATH='#/libraries',
+    LIBS=[env['LIBGCOM']],
+    CPPDEFINES=defines
+)
+
+env.Program(
+    target='client',
+    source=['client.c', src_class_example1, src_IDisplayText],
+    CPPPATH=env['INCDIRS'],
+    CPPDEFINES=defines,
+    LIBPATH='#/libraries',
+    LIBS=[env['LIBGCOM']]
+)
+
